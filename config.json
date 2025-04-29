@@ -1,0 +1,6 @@
+{
+    "YourGameKey": {
+        "gameexecutable": "PathToLaunchGame",
+        "gameprocessname": "NameOfTheProcessToSearch"
+    }
+}
