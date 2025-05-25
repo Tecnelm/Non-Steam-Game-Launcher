@@ -3,6 +3,7 @@ param (
     [switch]$ListGames,
     [switch]$ListGameInfo,
     [switch]$Help,
+    [switch]$Scan,
     [switch]$con  # Nouveau paramètre pour contrôler l'affichage de la console
 )
 
@@ -87,6 +88,177 @@ Examples:
     Write-Log $helpMessage
 }
 
+function Scan-GameFolders {
+    $GamesExePath = Join-Path -Path $ScriptPath -ChildPath "Games"
+
+    Write-Log "Scanning for game executables..." -Color "Cyan"
+    
+    # Common game installation directories
+    $commonPaths = @(
+        "$GamesExePath"
+    )
+    
+    $foundGames = @()
+    
+    foreach ($path in $commonPaths) {
+        if (Test-Path $path) {
+            Write-Log "Scanning: $path" -Color "Yellow"
+            
+            # Look for executable files
+            $executables = Get-ChildItem -Path $path -Recurse -Include "*.lnk" -ErrorAction SilentlyContinue |
+                Where-Object { 
+                    $_.Name -notmatch "(uninstall|setup|installer|updater|launcher|unity|unreal)"
+                } | Select-Object -First 50  # Limit results per folder
+            
+            foreach ($exe in $executables) {
+                $gameName = [System.IO.Path]::GetFileNameWithoutExtension($exe.Name)
+                $processName = $gameName
+                
+                $gameInfo = @{
+                    Name = $gameName
+                    Path = $exe.FullName
+                    ProcessName = $processName
+                    Directory = $exe.DirectoryName
+                }
+                
+                $foundGames += $gameInfo
+                Write-Log "Found: $gameName Directory ($($gameInfo.Directory))" -Color "Green"
+            }
+        }
+    }
+    
+    if ($foundGames.Count -eq 0) {
+        Write-Log "No game executables found in common directories." -Color "Yellow"
+        return
+    }
+    
+    Write-Log "`nFound $($foundGames.Count) potential games:" -Color "Cyan"
+    for ($i = 0; $i -lt $foundGames.Count; $i++) {
+        Write-Log "$($i + 1). $($foundGames[$i].Name) - $($foundGames[$i].Path)"
+    }
+    Append-To-Config $foundGames
+}
+
+function Append-To-Config
+{
+    param (
+        [array]$FoundGames,
+        [string]$ConfigurationPath = $ConfigPath
+    )
+    
+    Write-Log "Append new games to configuration" -Color "Yellow"
+
+
+    try {
+        # 1. Open configuration file and read it
+        Write-Log "Reading existing configuration from: $ConfigurationPath" -Color "Yellow"
+        
+        if (-not (Test-Path $ConfigurationPath)) {
+            Write-Log "Configuration file not found. Creating new configuration." -Color "Yellow"
+            $ExistingConfig = @{}
+        } else {
+            $configContent = Get-Content -Path $ConfigurationPath -Raw
+            if ([string]::IsNullOrWhiteSpace($configContent) -or $configContent.Trim() -eq "{}") {
+                Write-Log "Configuration file is empty. Starting with empty configuration." -Color "Yellow"
+                $ExistingConfig = @{}
+            } else {
+                $ExistingConfig = $configContent | ConvertFrom-Json
+                Write-Log "Existing configuration loaded successfully." -Color "Green"
+                Write-Log "Found $($ExistingConfig.PSObject.Properties.Name.Count) existing game(s) in configuration." -Color "Green"
+            }
+        }
+        
+        # 2. Remove elements already present in configuration
+        Write-Log "Filtering out games already present in configuration..." -Color "Yellow"
+        
+        $ExistingGameNames = @()
+        if ($ExistingConfig.PSObject.Properties) {
+            $ExistingGameNames = $ExistingConfig.PSObject.Properties.Name
+            Write-Log "Existing games in configuration: $($ExistingGameNames -join ', ')" -Color "Cyan"
+        }
+        
+        $NewGames = @()
+        $SkippedGames = @()
+        
+        foreach ($game in $FoundGames) {
+            if ($ExistingGameNames -contains $game.Name) {
+                $SkippedGames += $game.Name
+                Write-Log "Skipping '$($game.Name)' - already exists in configuration." -Color "Yellow"
+            } else {
+                $NewGames += $game
+                Write-Log "Adding '$($game.Name)' to new games list." -Color "Green"
+            }
+        }
+        Write-Log "Games to skip (already configured): $($SkippedGames.Count)" -Color "Yellow"
+        Write-Log "New games to add: $($NewGames.Count)" -Color "Green"
+        
+        if ($NewGames.Count -eq 0) {
+            Write-Log "No new games to add to configuration. All found games are already configured." -Color "Yellow"
+            return
+        }
+        
+        # 3. Append missing entries to the configuration
+        Write-Log "Appending new games to configuration..." -Color "Cyan"
+        
+        # Convert existing config to hashtable if it's a PSCustomObject
+        $ConfigHashtable = @{}
+        if ($ExistingConfig.PSObject.Properties) {
+            foreach ($property in $ExistingConfig.PSObject.Properties) {
+                $ConfigHashtable[$property.Name] = $property.Value
+            }
+        }
+        
+        $AddedCount = 0
+        foreach ($game in $NewGames) {
+            try {
+                # Create game configuration object
+                $gameConfig = @{
+                    gameexecutable = $game.Path
+                    gameprocessname = $game.ProcessName
+                    dateadded = (Get-Date -Format "yyyy-MM-dd HH:mm:ss")
+                }
+                
+                # Add to configuration hashtable
+                $ConfigHashtable[$game.Name] = $gameConfig
+                $AddedCount++
+                
+                Write-Log "Added '$($game.Name)' to configuration:" -Color "Green"
+                Write-Log "  - Executable: $($game.Path)" -Color "White"
+                Write-Log "  - Process Name: $($game.ProcessName)" -Color "White"
+                Write-Log "  - Directory: $($game.Directory)" -Color "White"
+                
+            } catch {
+                Write-Log "Error adding game '$($game.Name)' to configuration: $($_.Exception.Message)" -Color "Red"
+            }
+        }
+        
+        # Save updated configuration to file
+        Write-Log "Saving updated configuration to file..." -Color "Yellow"
+        
+        try {
+            $UpdatedConfig = $ConfigHashtable | ConvertTo-Json -Depth 100
+            Set-Content -Path $ConfigurationPath -Value $UpdatedConfig -Encoding UTF8
+            
+            Write-Log "Configuration updated successfully!" -Color "Green"
+            Write-Log "Total games in configuration: $($ConfigHashtable.Keys.Count)" -Color "Green"
+            Write-Log "New games added: $AddedCount" -Color "Green"
+            Write-Log "Configuration saved to: $ConfigurationPath" -Color "Green"
+            
+        } catch {
+            Write-Log "Error saving configuration file: $($_.Exception.Message)" -Color "Red"
+            throw
+        }
+        
+    } catch {
+        Write-Log "Error in Append-To-Config function: $($_.Exception.Message)" -Color "Red"
+        Write-Log "Stack trace: $($_.ScriptStackTrace)" -Color "Red"
+        throw
+    }
+    
+    Write-Log "Configuration update process completed." -Color "Cyan"
+}
+
+
 # Afficher l'aide si l'option -Help est activée
 if ($Help) {
     Show-Help
@@ -98,6 +270,12 @@ if ($Help) {
 Write-Log "Script path: $ScriptPath" -Color Green
 Write-Log "Log file path: $LogFile" -Color Green
 Write-Log "Configuration file path: $ConfigPath" -Color Green
+
+if ($Scan) {
+    Scan-GameFolders 
+    Wait-Action
+    Exit 0
+}
 
 # Vérifier si le fichier de configuration existe, sinon le créer
 if (-not (Test-Path $ConfigPath)) {
