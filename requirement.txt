@@ -1,0 +1,2 @@
+steam-vdf >= 0.1.10
+pyreadline3 >= 3.5.4

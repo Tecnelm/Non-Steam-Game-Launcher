@@ -1,9 +1,11 @@
 param (
     [string]$game,
+    [string]$SteamAccount,
     [switch]$ListGames,
     [switch]$ListGameInfo,
     [switch]$Help,
     [switch]$Scan,
+    [switch]$ExportGame,
     [switch]$con  # Nouveau paramètre pour contrôler l'affichage de la console
 )
 
@@ -78,11 +80,16 @@ Options:
   -game <string>        Specify the name of the game to launch or get info for.
   -ListGames            List all games in the configuration.
   -ListGameInfo         List information for a specific game.
+  -Scan                 Automatically scan shortcut in Games directory and add them to configuration.
+  -ExportGame           Export games in configuration to steam. Note call python -m pip install -r requirement.txt before.
+  -SteamAccount         The name of the steam accound to use. 
   -Help                 Display this help message.
 
 Examples:
   .\Launcher.exe -ListGames
   .\Launcher.exe -ListGameInfo -game 'GameName'
+  .\Launcher.exe -Scan'
+  .\Launcher.exe -ExportGame -SteamAccount <Name>'
   .\Launcher.exe -game 'GameName'
 "@
     Write-Log $helpMessage
@@ -258,6 +265,18 @@ function Append-To-Config
     Write-Log "Configuration update process completed." -Color "Cyan"
 }
 
+function Export-Game-Steam{
+    $PythonExportPath = Join-Path -Path $ScriptPath -ChildPath "ExportShortcut.py"
+
+    # Run the Python script and capture the output
+    $output = python $PythonExportPath --config $ConfigPath --account $SteamAccount --launcher $ScriptPath 2>&1
+
+    # Write the output to the log
+    $output | ForEach-Object {
+        Write-Log -Message $_ -Color Green
+    }
+    Wait-Action
+}
 
 # Afficher l'aide si l'option -Help est activée
 if ($Help) {
@@ -274,6 +293,11 @@ Write-Log "Configuration file path: $ConfigPath" -Color Green
 if ($Scan) {
     Scan-GameFolders 
     Wait-Action
+    Exit 0
+}
+if ($ExportGame)
+{
+    Export-Game-Steam
     Exit 0
 }
 

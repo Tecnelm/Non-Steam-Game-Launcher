@@ -1,0 +1,11 @@
+{
+    "YourGameKey": {
+        "gameexecutable": "PathToLaunchGame",
+        "gameprocessname": "NameOfTheProcessToSearch"
+    },
+    "YourGameKeyBis": {
+        "applicationname": "applicationNameSteamOverride",
+        "gameexecutable": "PathToLaunchGame",
+        "gameprocessname": "NameOfTheProcessToSearch"
+    }
+}
