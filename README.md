@@ -16,6 +16,7 @@ A PowerShell-based game launcher utility designed to manage and monitor game pro
 - Windows Operating System
 - PowerShell 5.1 or later
 - PS2EXE module (for building executable)
+- python 3.11 with module steam-vdf and pyreadline3
 
 ## Installation
 
@@ -51,6 +52,7 @@ Create or modify the `config.json` file in the same directory as the executable:
         "gameprocessname": "NameOfTheProcessToSearch"
     },
     "Steam Game Example": {
+        "applicationname" : "Your Application override"
         "gameexecutable": "C:\\Program Files (x86)\\Steam\\steam.exe",
         "gameprocessname": "GameProcess"
     },
@@ -60,7 +62,7 @@ Create or modify the `config.json` file in the same directory as the executable:
     }
 }
 ```
-
+`applicationname` Will be use in export shortcut to steam functionnality to override default name (json key)
 #### Configuration Parameters
 
 - **gameexecutable**: Full path to the game executable or launcher
@@ -96,6 +98,16 @@ Options:
 #### Get Game Information
 ```powershell
 .\Launcher.exe -ListGameInfo -game "YourGameKey"
+```
+#### Export game to steam 
+```powershell
+>First time : python -m pip install -r requirement.txt
+.\Launcher.exe -ExportGame -con -SteamAccount <SteamAccountName>
+```
+#### Auto Scan functionnality
+Will create entry in configuration for *.lnk files in `<scriptDir>\Games`
+```powershell
+.\Launcher.exe -scan -con
 ```
 
 #### Debug Mode (with console)
