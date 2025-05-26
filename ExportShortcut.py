@@ -28,7 +28,7 @@ def parse_arguments():
     # Check if command was provided, if not show help
     return parser.parse_args()
 
-def create_shortcut_entry(app_name: str, launcher_path: str) -> Dict[str, Any]:
+def create_shortcut_entry(app_name: str, launcher_path: str,steam_app_name:str) -> Dict[str, Any]:
     """
     Create a new shortcut entry for Steam
     
@@ -40,8 +40,8 @@ def create_shortcut_entry(app_name: str, launcher_path: str) -> Dict[str, Any]:
         Dictionary containing the shortcut entry data
     """
     # Validate inputs
-    if not app_name or not launcher_path:
-        raise ValueError("app_name and launcher_path cannot be empty")
+    if not app_name or not launcher_path or not steam_app_name:
+        raise ValueError("app_name, launcher_path and steam_app_name cannot be empty")
     
     if not os.path.exists(launcher_path):
         raise FileNotFoundError(f"Launcher path does not exist: {launcher_path}")
@@ -54,7 +54,7 @@ def create_shortcut_entry(app_name: str, launcher_path: str) -> Dict[str, Any]:
 
     # Create the shortcut entry
     entry = {
-        "appname": app_name,
+        "appname": steam_app_name,
         "exe": f'"{launcher_path}"',
         "StartDir": exe_dir,
         "icon": "",
@@ -120,7 +120,7 @@ def shortcut_already_exists(shortcuts: Dict[str, Any], app_name: str) -> bool:
     return False
 
 
-def add_shortcut(vdf_path: str, app_name: str, launcher_path: str) -> bool:
+def add_shortcut(vdf_path: str, app_name: str, launcher_path: str,steam_app_name:str = None) -> bool:
     """
     Add a shortcut to the Steam shortcuts file
     
@@ -142,8 +142,8 @@ def add_shortcut(vdf_path: str, app_name: str, launcher_path: str) -> bool:
         if shortcut_already_exists(shortcuts, app_name):
             logger.info("Shortcut for '%s' already exists, skipping", app_name)
             return True
-            
-        game_entry = create_shortcut_entry(app_name, launcher_path)
+        steam_app_name = app_name if steam_app_name is None else steam_app_name
+        game_entry = create_shortcut_entry(app_name, launcher_path,steam_app_name)
         shortcuts = users.add_shortcut_to_shortcuts(shortcuts, game_entry)
         
         if users.save_shortcuts(vdf_path, shortcuts):
@@ -317,9 +317,10 @@ def main():
     total_count = len(config_data)
     
     for app_name in config_data:
+        steam_app_name = None
         if "applicationname" in config_data[app_name]:
-            app_name = config_data[app_name]["applicationname"]
-        if add_shortcut(shortcuts_vdf, app_name, launcher_path):
+            steam_app_name = config_data[app_name]["applicationname"]
+        if add_shortcut(shortcuts_vdf, app_name, launcher_path,steam_app_name):
             success_count += 1
         else:
             logger.warning("Failed to add shortcut for: %s", app_name)

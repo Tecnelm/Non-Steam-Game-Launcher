@@ -267,9 +267,10 @@ function Append-To-Config
 
 function Export-Game-Steam{
     $PythonExportPath = Join-Path -Path $ScriptPath -ChildPath "ExportShortcut.py"
+    $LauncherPath = Join-Path -Path $ScriptPath -ChildPath "Launcher.exe"
 
     # Run the Python script and capture the output
-    $output = python $PythonExportPath --config $ConfigPath --account $SteamAccount --launcher $ScriptPath 2>&1
+    $output = python $PythonExportPath --config $ConfigPath --account $SteamAccount --launcher $LauncherPath 2>&1
 
     # Write the output to the log
     $output | ForEach-Object {
